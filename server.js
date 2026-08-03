@@ -61,9 +61,6 @@ app.use(
   })
 );
 
-// Explicitly handle HTTP Preflight (OPTIONS) requests with safe wildcard route
-*
-
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
