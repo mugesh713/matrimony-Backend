@@ -21,14 +21,48 @@ const app = express();
 connectDB();
 
 // ===============================
-// Middleware
+// Dynamic CORS Configuration
 // ===============================
+const allowedOrigins = [
+  "https://matrimony-blue.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+// Append CLIENT_URL from .env if provided
+if (process.env.CLIENT_URL) {
+  const cleanUrl = process.env.CLIENT_URL.replace(/\/$/, "");
+  if (!allowedOrigins.includes(cleanUrl)) {
+    allowedOrigins.push(cleanUrl);
+  }
+}
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Allow non-browser requests (e.g., Postman, mobile apps, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.replace(/\/$/, "");
+
+      // Allow if listed explicitly OR if it matches any Vercel domain (*.vercel.app)
+      const isAllowedVercelDomain = /\.vercel\.app$/.test(cleanOrigin);
+
+      if (allowedOrigins.includes(cleanOrigin) || isAllowedVercelDomain) {
+        return callback(null, true);
+      } else {
+        console.error(`CORS Blocked Origin: ${origin}`);
+        return callback(new Error("CORS policy error: Origin not allowed."));
+      }
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Explicitly handle HTTP Preflight (OPTIONS) requests
+app.options("*", cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -70,7 +104,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
-  res.status(500).json({
+  res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
   });
