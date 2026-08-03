@@ -21,14 +21,46 @@ const app = express();
 connectDB();
 
 // ===============================
-// Middleware
+// CORS Middleware Configuration
 // ===============================
+const allowedOrigins = [
+  "https://matrimony-blue.vercel.app",
+  "https://matrimonyweb-theta.vercel.app/",
+  "http://localhost:5173",
+  "http://localhost:3000",
+];
+
+// Append process.env.CLIENT_URL if provided
+if (process.env.CLIENT_URL) {
+  // Normalize by removing any trailing slashes
+  const cleanUrl = process.env.CLIENT_URL.replace(/\/$/, "");
+  if (!allowedOrigins.includes(cleanUrl)) {
+    allowedOrigins.push(cleanUrl);
+  }
+}
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: function (origin, callback) {
+      // Allow non-browser requests (like Postman, mobile apps, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const cleanOrigin = origin.replace(/\/$/, "");
+      if (allowedOrigins.includes(cleanOrigin)) {
+        return callback(null, true);
+      } else {
+        console.error(`CORS blocked request from origin: ${origin}`);
+        return callback(new Error("CORS policy error: Origin not allowed."));
+      }
+    },
     credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
+// Explicitly handle HTTP Preflight (OPTIONS) requests
+app.options("*", cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -70,7 +102,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
 
-  res.status(500).json({
+  res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
   });
